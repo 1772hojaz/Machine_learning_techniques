@@ -1,44 +1,47 @@
 import streamlit as st
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 import torch
 
-st.set_page_config(page_title="🤖 Chatbot", layout="centered")
-st.title("🤖 Your Hugging Face Chatbot")
+st.set_page_config(page_title="🌾 BERT2BERT Chatbot", layout="centered")
+st.title("🤖 Agriculture Chatbot (BERT2BERT)")
+st.caption("Powered by nyahoja/agriculture")
 
-# Load model and tokenizer from Hugging Face
+# Load model and tokenizer
 @st.cache_resource
 def load_model():
-    model_name = "nyahoja/agriculture"  # <-- your chatbot model on HF
+    model_name = "nyahoja/agriculture"
     tokenizer = AutoTokenizer.from_pretrained(model_name)
-    model = AutoModelForCausalLM.from_pretrained(model_name)
+    model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
     return tokenizer, model
 
 tokenizer, model = load_model()
 
-# Initialize chat history
-if "history" not in st.session_state:
-    st.session_state.history = []
+# Conversation history (optional)
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = []
 
-# Chat input
-user_input = st.chat_input("Say something to the bot...")
+# User input box
+user_input = st.chat_input("Ask me a question about farming...")
 
 if user_input:
-    # Show user input
     st.chat_message("user").markdown(user_input)
-    st.session_state.history.append(("user", user_input))
+    st.session_state.chat_history.append({"role": "user", "text": user_input})
 
-    # Encode input with history (optional)
-    prompt = user_input
-    inputs = tokenizer.encode(prompt, return_tensors="pt")
+    # Tokenize user input
+    inputs = tokenizer(user_input, return_tensors="pt")
 
     # Generate response
-    outputs = model.generate(inputs, max_length=256, pad_token_id=tokenizer.eos_token_id)
+    with torch.no_grad():
+        outputs = model.generate(
+            inputs["input_ids"],
+            max_length=128,
+            num_beams=4,
+            early_stopping=True
+        )
+
+    # Decode response
     response = tokenizer.decode(outputs[0], skip_special_tokens=True)
 
-    # Get only the new response (after the prompt)
-    bot_reply = response[len(prompt):].strip()
-
-    # Display response
-    st.chat_message("assistant").markdown(bot_reply)
-    st.session_state.history.append(("bot", bot_reply))
+    st.chat_message("assistant").markdown(response)
+    st.session_state.chat_history.append({"role": "bot", "text": response})
 

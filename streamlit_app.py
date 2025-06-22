@@ -2,46 +2,39 @@ import streamlit as st
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 import torch
 
-st.set_page_config(page_title="🌾 BERT2BERT Chatbot", layout="centered")
-st.title("🤖 Agriculture Chatbot (BERT2BERT)")
-st.caption("Powered by nyahoja/agriculture")
+st.set_page_config(page_title="🌾 Agriculture Chatbot", layout="centered")
+st.title("🌾 Ask Your Farming Assistant")
+st.caption("Model: google/flan-t5-large (prompted for agriculture)")
 
-# Load model and tokenizer
 @st.cache_resource
 def load_model():
-    model_name = "nyahoja/agriculture"
+    model_name = "google/flan-t5-large"
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
     return tokenizer, model
 
 tokenizer, model = load_model()
 
-# Conversation history (optional)
-if "chat_history" not in st.session_state:
-    st.session_state.chat_history = []
+# Chat memory
+if "chat" not in st.session_state:
+    st.session_state.chat = []
 
-# User input box
-user_input = st.chat_input("Ask me a question about farming...")
+# User input
+user_input = st.chat_input("Ask something about farming...")
 
 if user_input:
     st.chat_message("user").markdown(user_input)
-    st.session_state.chat_history.append({"role": "user", "text": user_input})
+    st.session_state.chat.append(("user", user_input))
 
-    # Tokenize user input
-    inputs = tokenizer(user_input, return_tensors="pt")
+    # Prompt engineering: Guide the model
+    prompt = f"You are an expert in agriculture. Answer the following farming-related question:\n\n{user_input}"
 
-    # Generate response
-    with torch.no_grad():
-        outputs = model.generate(
-            inputs["input_ids"],
-            max_length=128,
-            num_beams=4,
-            early_stopping=True
-        )
-
-    # Decode response
+    # Tokenize and generate
+    inputs = tokenizer(prompt, return_tensors="pt")
+    outputs = model.generate(**inputs, max_length=256)
     response = tokenizer.decode(outputs[0], skip_special_tokens=True)
 
+    # Display and store
     st.chat_message("assistant").markdown(response)
-    st.session_state.chat_history.append({"role": "bot", "text": response})
+    st.session_state.chat.append(("bot", response))
 

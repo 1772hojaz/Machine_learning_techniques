@@ -1,40 +1,44 @@
 import streamlit as st
-import requests
+from transformers import AutoModelForCausalLM, AutoTokenizer
+import torch
 
-# Title and description
-st.title("🌾 Agriculture NLP Classifier")
-st.write("Enter a farming-related question, and the model will classify it.")
+st.set_page_config(page_title="🤖 Chatbot", layout="centered")
+st.title("🤖 Your Hugging Face Chatbot")
 
-# Get token from Streamlit secrets
-hf_token = st.secrets["huggingface"]["api_token"]
+# Load model and tokenizer from Hugging Face
+@st.cache_resource
+def load_model():
+    model_name = "nyahoja/agriculture"  # <-- your chatbot model on HF
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    model = AutoModelForCausalLM.from_pretrained(model_name)
+    return tokenizer, model
 
-# Hugging Face API endpoint
-HF_API_URL = "https://api-inference.huggingface.co/models/nyahoja/agriculture"
+tokenizer, model = load_model()
 
-# User input
-user_input = st.text_area("Your question or issue:")
+# Initialize chat history
+if "history" not in st.session_state:
+    st.session_state.history = []
 
-# On button click
-if st.button("Classify"):
-    if user_input.strip():
-        with st.spinner("Calling Hugging Face model..."):
+# Chat input
+user_input = st.chat_input("Say something to the bot...")
 
-            headers = {
-                "Authorization": f"Bearer {hf_token}",
-                "Content-Type": "application/json"
-            }
+if user_input:
+    # Show user input
+    st.chat_message("user").markdown(user_input)
+    st.session_state.history.append(("user", user_input))
 
-            payload = {"inputs": user_input}
+    # Encode input with history (optional)
+    prompt = user_input
+    inputs = tokenizer.encode(prompt, return_tensors="pt")
 
-            response = requests.post(HF_API_URL, headers=headers, json=payload)
+    # Generate response
+    outputs = model.generate(inputs, max_length=256, pad_token_id=tokenizer.eos_token_id)
+    response = tokenizer.decode(outputs[0], skip_special_tokens=True)
 
-            if response.status_code == 200:
-                result = response.json()
-                st.subheader("🔍 Prediction:")
-                for item in result:
-                    label = item.get("label", "N/A")
-                    score = item.get("score", 0.0)
-                    st.write(f"- **{label}** with confidence `{score:.2f}`")
-            else:
-                st.error(f"❌ API Error {response.status_code}: {response.text}")
+    # Get only the new response (after the prompt)
+    bot_reply = response[len(prompt):].strip()
+
+    # Display response
+    st.chat_message("assistant").markdown(bot_reply)
+    st.session_state.history.append(("bot", bot_reply))
 

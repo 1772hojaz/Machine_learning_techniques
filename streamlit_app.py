@@ -4,7 +4,7 @@ import torch
 
 # Read from secrets.toml
 model_name = st.secrets["general"]["HF_MODEL_NAME"]
-b = st.secrets["general"]["AGRI_PROMPT"]
+b = st.secrets["general"]["AGRI"]
 
 st.set_page_config(page_title="Farm Bot", layout="centered")
 st.title("Agriculture Chatbot")
@@ -28,11 +28,10 @@ if user_input:
     st.chat_message("user").markdown(user_input)
     st.session_state.chat.append(("user", user_input))
 
-    # Construct hallucination prompt
-    prompt = f"{b}\n\nUser: {user_input}\nAgriculture Expert:"
+    p = f"{b}\n\nUser: {user_input}\nAgriculture Expert:"
 
     # Generate response
-    inputs = tokenizer(prompt, return_tensors="pt", truncation=True)
+    inputs = tokenizer(p, return_tensors="pt", truncation=True)
     outputs = model.generate(**inputs, max_length=256)
     response = tokenizer.decode(outputs[0], skip_special_tokens=True)
 
